@@ -87,6 +87,10 @@ pub const Slice = struct {
 
     // flag
 
+    pub fn get_flag(self: Slice, index: usize) Flag {
+        return self.elements.items(.flag)[index];
+    }
+
     pub fn expand(self: Slice, coll: usize, prev: usize) void {
         assert(prev > coll);
         const flags = self.elements.items(.flag);

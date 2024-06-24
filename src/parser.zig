@@ -2,9 +2,6 @@ pub const Error = error{
     IncompleteMap,
     IncompleteArray,
     IllegalToken,
-    IllegalMapEnd,
-    IllegalArrayEnd,
-    IllegalEquals,
     ExpectedEquals,
 };
 
@@ -34,16 +31,15 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
                     },
                     else => return Error.IncompleteMap,
                 },
-                .eql => return Error.IllegalEquals,
-                .arr_end => return Error.IllegalArrayEnd,
+                .eql, .arr_end => return Error.IllegalToken,
                 .sep => slice.alter_flag(coll, prev, .add_sep),
                 .gap => slice.alter_flag(coll, prev, .add_gap),
                 .com => {
+                    slice.alter_flag(coll, prev, .del_sep);
                     prev = list.len;
                     try list.append(.com, .exp);
                     // reslice
                     slice = list.slice();
-                    slice.alter_flag(coll, prev - 1, .del_sep);
                     slice.grow_by(coll, 1);
                     slice.set_source(prev, token.src);
                     slice.expand(coll, prev);
@@ -52,7 +48,7 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
                     slice.alter_flag(coll, prev, .del_all);
                     prev = coll;
                     _ = path.pop();
-                    coll = path.getLastOrNull() orelse return Error.IllegalMapEnd;
+                    coll = path.getLastOrNull() orelse return Error.IllegalToken;
                     slice.expand(coll, prev);
                     slice.grow_by(coll, slice.get_size(prev));
                 },
@@ -127,8 +123,7 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
             },
             .arr, .tarr => switch (token.tag) {
                 .end => return Error.IncompleteArray,
-                .eql => return Error.IllegalEquals,
-                .map_end => return Error.IllegalMapEnd,
+                .eql, .map_end => return Error.IllegalToken,
                 .sep => slice.alter_flag(coll, prev, .add_sep),
                 .gap => slice.alter_flag(coll, prev, .add_gap),
                 .com => {
@@ -207,34 +202,81 @@ const ElementList = @import("element_list.zig");
 
 // TODO. write tests!
 
-test "comments" {
+const TestInput = struct {
+    kind: ElementList.Kind,
+    flag: ElementList.Flag,
+};
+
+fn test_elements(input: []const u8, els: []const TestInput) !void {
     const ally = std.testing.allocator;
-    var tree = try parse(ally,
-        \\#
-        \\ a = [1 2 
-        \\
-        \\ 3,,,,
-        \\ |raw
-        \\]
-        \\
-    );
+    var tree = try parse(ally, input);
     defer tree.deinit(ally);
-
-    for (0..tree.elements.len) |i| {
-        const el = tree.elements.get(i);
-
-        switch (el.kind) {
-            .kv, .map, .tmap, .arr, .tarr => {
-                std.debug.print("{s} {s} ({})\n", .{
-                    @tagName(el.kind),
-                    @tagName(el.flag),
-                    tree.sizes[el.index],
-                });
-            },
-            else => std.debug.print("{s} {s}\n", .{
-                @tagName(el.kind),
-                @tagName(el.flag),
-            }),
-        }
+    try std.testing.expectEqual(tree.elements.len, els.len);
+    for (els, 0..) |el, i| {
+        // TODO size checks
+        try std.testing.expectEqual(el.kind, tree.get_kind(i));
+        try std.testing.expectEqual(el.flag, tree.get_flag(i));
     }
+}
+
+test "empty" {
+    try test_elements("", &.{.{ .kind = .map, .flag = .exp }});
+    try test_elements(", ,\t\t \n\r\n,\n  ,", &.{.{ .kind = .map, .flag = .exp }});
+}
+
+test "comments" {
+    try test_elements(
+        \\#
+        \\,
+        \\
+        \\ #
+        \\
+        \\,#
+    , &.{
+        .{ .kind = .map, .flag = .exp },
+        .{ .kind = .com, .flag = .exp_gap },
+        .{ .kind = .com, .flag = .exp_gap },
+        .{ .kind = .com, .flag = .exp },
+    });
+}
+
+test "collection errors" {
+    try std.testing.expectError(Error.IllegalToken, test_elements("=", &.{}));
+    try std.testing.expectError(Error.IllegalToken, test_elements("]", &.{}));
+    try std.testing.expectError(Error.IllegalToken, test_elements(")", &.{}));
+    try std.testing.expectError(Error.IncompleteMap, test_elements("[(", &.{}));
+    try std.testing.expectError(Error.ExpectedEquals, test_elements("()", &.{}));
+    try std.testing.expectError(Error.ExpectedEquals, test_elements("42", &.{}));
+    try std.testing.expectError(Error.IncompleteMap, test_elements("(), =", &.{}));
+    try std.testing.expectError(Error.IncompleteArray, test_elements("([", &.{}));
+}
+
+test "inline kv pairs" {
+    try test_elements(
+        \\a=1,b=,2 c = 3,
+        \\
+        \\d=
+        \\  4,
+        \\#
+        \\
+        \\d=5
+    , &.{
+        .{ .kind = .map, .flag = .exp },
+        .{ .kind = .kv, .flag = .inl_sep },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+        .{ .kind = .kv, .flag = .inl },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+        .{ .kind = .kv, .flag = .inl_sep },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+        .{ .kind = .kv, .flag = .inl },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+        .{ .kind = .com, .flag = .exp_gap },
+        .{ .kind = .kv, .flag = .inl },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+    });
 }
