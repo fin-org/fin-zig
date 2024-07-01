@@ -91,6 +91,13 @@ pub const Slice = struct {
         return self.elements.items(.flag)[index];
     }
 
+    pub fn expanded(self: Slice, index: usize) bool {
+        return switch (self.get_flag(index)) {
+            .exp, .exp_sep, .exp_gap => true,
+            else => false,
+        };
+    }
+
     pub fn expand(self: Slice, coll: usize, prev: usize) void {
         assert(prev > coll);
         const flags = self.elements.items(.flag);
@@ -197,9 +204,129 @@ pub const Slice = struct {
         assert(size == 1 + key_size + val_size);
         return .val;
     }
+
+    // output
+
+    pub fn write(self: Slice, ally: Allocator, w: anytype) !void {
+        const kinds = self.elements.items(.kind);
+        const idxs = self.elements.items(.index);
+        const flags = self.elements.items(.flag);
+        var e: usize = 0;
+        var p: usize = 0;
+        var c: usize = 0;
+        var f: usize = self.sizes[idxs[0]];
+        var tabs: u16 = 0;
+        var newline = false;
+        var path = try std.ArrayList(usize).initCapacity(ally, 16);
+        defer path.deinit();
+
+        while (true) {
+            if (e == f) {
+                // finish collection
+                if (c == 0) break;
+                switch (kinds[c]) {
+                    .kv => {},
+                    else => |kind| {
+                        tabs -= 1;
+                        if (newline) {
+                            try w.writeByteNTimes('\t', tabs);
+                            newline = false;
+                        }
+                        switch (kind) {
+                            .map, .tmap => try w.writeByte(')'),
+                            .arr, .tarr => try w.writeByte(']'),
+                            else => unreachable,
+                        }
+                    },
+                }
+                p = c;
+                _ = path.pop();
+                c = path.getLast();
+                f = c + self.sizes[idxs[c]];
+            } else {
+                if (newline) try w.writeByteNTimes('\t', tabs);
+                switch (kinds[e]) {
+                    .sym, .num, .esc => try w.writeAll(self.sources[idxs[e]]),
+                    .raw => try w.writeAll("|RAW"),
+                    .com => try w.writeAll("#COM"),
+                    else => |kind| {
+                        // start collection
+                        c = e;
+                        try path.append(c);
+                        f = c + self.sizes[idxs[e]];
+                        e += 1;
+                        if (c == 0) continue;
+                        switch (kind) {
+                            .map => try w.writeByte('('),
+                            .arr => try w.writeByte('['),
+                            .tmap => {
+                                try w.writeAll(self.sources[idxs[e]]);
+                                try w.writeByte('(');
+                                e += 1;
+                            },
+                            .tarr => {
+                                try w.writeAll(self.sources[idxs[e]]);
+                                try w.writeByte('[');
+                                e += 1;
+                            },
+                            .kv => {
+                                newline = false;
+                                continue;
+                            },
+                            else => unreachable,
+                        }
+                        tabs += 1;
+                        newline = switch (flags[c]) {
+                            .exp, .exp_sep, .exp_gap => true,
+                            else => false,
+                        };
+                        if (newline) try w.writeByte('\n');
+                        continue;
+                    },
+                }
+                p = e;
+                e += 1;
+            }
+
+            if (kinds[c] == .kv) {
+                if (c == (p - 1)) {
+                    if (kinds[p] == .raw) {
+                        try w.writeByte('\n');
+                        try w.writeByteNTimes('\t', tabs);
+                    } else {
+                        try w.writeByte(' ');
+                    }
+                    try w.writeByte('=');
+                    if (kinds[e] == .raw) {
+                        try w.writeByte('\n');
+                        try w.writeByteNTimes('\t', tabs);
+                    } else {
+                        try w.writeByte(' ');
+                    }
+                }
+            } else switch (flags[c]) {
+                .exp, .exp_sep, .exp_gap => switch (flags[p]) {
+                    .inl_gap, .exp_gap => {
+                        try w.writeByteNTimes('\n', 2);
+                        newline = true;
+                    },
+                    .inl_sep, .exp_sep => {
+                        try w.writeAll(", ");
+                        newline = false;
+                    },
+                    .inl, .exp => {
+                        try w.writeByte('\n');
+                        newline = true;
+                    },
+                },
+                else => if (e < f) try w.writeAll(", "),
+            }
+        }
+    }
 };
 
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
+const Writer = std.io.Writer;
 const ElementList = @This();

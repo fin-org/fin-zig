@@ -9,7 +9,7 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
     var list = ElementList.init(ally);
     defer list.deinit();
 
-    var path = std.ArrayList(usize).init(ally);
+    var path = try std.ArrayList(usize).initCapacity(ally, 16);
     defer path.deinit();
 
     var tokenizer = Tokenizer.init(input);
@@ -194,31 +194,6 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
     return list.to_owned_slice();
 }
 
-const std = @import("std");
-const assert = std.debug.assert;
-const Allocator = std.mem.Allocator;
-const Tokenizer = @import("tokenizer.zig");
-const ElementList = @import("element_list.zig");
-
-// TODO. write tests!
-
-const TestInput = struct {
-    kind: ElementList.Kind,
-    flag: ElementList.Flag,
-};
-
-fn test_elements(input: []const u8, els: []const TestInput) !void {
-    const ally = std.testing.allocator;
-    var tree = try parse(ally, input);
-    defer tree.deinit(ally);
-    try std.testing.expectEqual(tree.elements.len, els.len);
-    for (els, 0..) |el, i| {
-        // TODO size checks
-        try std.testing.expectEqual(el.kind, tree.get_kind(i));
-        try std.testing.expectEqual(el.flag, tree.get_flag(i));
-    }
-}
-
 test "empty" {
     try test_elements("", &.{.{ .kind = .map, .flag = .exp }});
     try test_elements(", ,\t\t \n\r\n,\n  ,", &.{.{ .kind = .map, .flag = .exp }});
@@ -280,3 +255,100 @@ test "inline kv pairs" {
         .{ .kind = .num, .flag = .inl },
     });
 }
+
+test "inline array" {
+    try test_elements(
+        \\a=[1,2
+        \\
+        \\    3 4]
+    , &.{
+        .{ .kind = .map, .flag = .exp },
+        .{ .kind = .kv, .flag = .inl },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .arr, .flag = .inl },
+        .{ .kind = .num, .flag = .inl_sep },
+        .{ .kind = .num, .flag = .inl_gap },
+        .{ .kind = .num, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+    });
+}
+
+test "nested example 1" {
+    try test_elements(
+        \\a=([]=1, "b"=()), c=d
+    , &.{
+        .{ .kind = .map, .flag = .exp },
+        .{ .kind = .kv, .flag = .inl_sep },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .map, .flag = .inl },
+        .{ .kind = .kv, .flag = .inl_sep },
+        .{ .kind = .arr, .flag = .inl },
+        .{ .kind = .num, .flag = .inl },
+        .{ .kind = .kv, .flag = .inl },
+        .{ .kind = .esc, .flag = .inl },
+        .{ .kind = .map, .flag = .inl },
+        .{ .kind = .kv, .flag = .inl },
+        .{ .kind = .sym, .flag = .inl },
+        .{ .kind = .sym, .flag = .inl },
+    });
+}
+
+// test "io writer usage" {
+//     const ally = std.testing.allocator;
+//     var tree = try parse(ally,
+//         \\a=tag[ #
+//         \\1,2
+//         \\
+//         \\"three"
+//         \\
+//         \\], b=[]
+//         \\
+//         \\| a
+//         \\,, = | b
+//         \\
+//         \\
+//         \\
+//         \\c=(1=2 3=4 5=|6
+//         \\
+//         \\|7
+//         \\  = |8
+//         \\nest = [(
+//         \\|9
+//         \\= "done")]
+//         \\)
+//         \\d=[1,2
+//         \\
+//         \\3], #done
+//     );
+//     defer tree.deinit(ally);
+
+//     var list = std.ArrayList(u8).init(ally);
+//     defer list.deinit();
+
+//     try tree.write(ally, list.writer());
+
+//     std.debug.print("\n---\n{s}---\n", .{list.items});
+// }
+
+const TestInput = struct {
+    kind: ElementList.Kind,
+    flag: ElementList.Flag,
+};
+
+fn test_elements(input: []const u8, els: []const TestInput) !void {
+    const ally = std.testing.allocator;
+    var tree = try parse(ally, input);
+    defer tree.deinit(ally);
+    try std.testing.expectEqual(tree.elements.len, els.len);
+    for (els, 0..) |el, i| {
+        // TODO size checks
+        try std.testing.expectEqual(el.kind, tree.get_kind(i));
+        try std.testing.expectEqual(el.flag, tree.get_flag(i));
+    }
+}
+
+const std = @import("std");
+const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+const Tokenizer = @import("tokenizer.zig");
+const ElementList = @import("element_list.zig");
