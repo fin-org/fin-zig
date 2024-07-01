@@ -306,7 +306,7 @@ test "nested example 1" {
     });
 }
 
-test "io writer usage" {
+test "output example" {
     const ally = std.testing.allocator;
     var tree = try parse(ally,
         \\a=tag[ #
@@ -318,13 +318,20 @@ test "io writer usage" {
         \\
         \\| a
         \\,, = | b
-        \\
-        \\
-        \\
+        \\ | c
+        \\|d
         \\c=(1=2 3=4 5=|6
+        \\|6b
         \\
         \\|7
+        \\  | SEVEN
         \\  = |8
+        \\ | EIGHT
+        \\
+        \\
+        \\ # even
+        \\ # more
+        \\    # nesting
         \\nest = [(
         \\a=b, |9
         \\= "done", |a
@@ -336,13 +343,53 @@ test "io writer usage" {
         \\3], #done
     );
     defer tree.deinit(ally);
-
     var list = std.ArrayList(u8).init(ally);
     defer list.deinit();
-
     try tree.write(ally, list.writer());
-
-    std.debug.print("\n---\n{s}---\n", .{list.items});
+    try std.testing.expectEqualStrings(
+        \\a = tag[
+        \\	#
+        \\	1, 2
+        \\
+        \\	"three"
+        \\], b = []
+        \\
+        \\| a
+        \\=
+        \\| b
+        \\| c
+        \\|d
+        \\c = (
+        \\	1 = 2
+        \\	3 = 4
+        \\	5 =
+        \\	|6
+        \\	|6b
+        \\
+        \\	|7
+        \\	| SEVEN
+        \\	=
+        \\	|8
+        \\	| EIGHT
+        \\
+        \\	# even
+        \\	# more
+        \\	# nesting
+        \\	nest = [
+        \\		(
+        \\			a = b
+        \\			|9
+        \\			= "done"
+        \\			|a
+        \\			=
+        \\			|b
+        \\		)
+        \\	]
+        \\)
+        \\d = [1, 2, 3]
+        \\#done
+        \\
+    , list.items);
 }
 
 const TestInput = struct {

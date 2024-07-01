@@ -247,8 +247,36 @@ pub const Slice = struct {
                 if (newline) try w.writeByteNTimes('\t', tabs);
                 switch (kinds[e]) {
                     .sym, .num, .esc => try w.writeAll(self.sources[idxs[e]]),
-                    .raw => try w.writeAll("|RAW"),
-                    .com => try w.writeAll("#COM"),
+                    .raw => {
+                        var ignore = true;
+                        for (self.sources[idxs[e]]) |b| {
+                            if (ignore) switch (b) {
+                                ' ', '\t' => continue,
+                                '|' => ignore = false,
+                                else => unreachable,
+                            };
+                            try w.writeByte(b);
+                            if (b == '\n') {
+                                ignore = true;
+                                try w.writeByteNTimes('\t', tabs);
+                            }
+                        }
+                    },
+                    .com => {
+                        var ignore = true;
+                        for (self.sources[idxs[e]]) |b| {
+                            if (ignore) switch (b) {
+                                ' ', '\t' => continue,
+                                '#' => ignore = false,
+                                else => unreachable,
+                            };
+                            try w.writeByte(b);
+                            if (b == '\n') {
+                                ignore = true;
+                                try w.writeByteNTimes('\t', tabs);
+                            }
+                        }
+                    },
                     else => |kind| {
                         // start collection
                         c = e;
