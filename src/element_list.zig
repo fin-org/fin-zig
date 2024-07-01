@@ -311,8 +311,13 @@ pub const Slice = struct {
                         newline = true;
                     },
                     .inl_sep, .exp_sep => {
-                        try w.writeAll(", ");
-                        newline = false;
+                        if (kinds[e] == .kv and kinds[e + 1] == .raw) {
+                            try w.writeByte('\n');
+                            newline = true;
+                        } else {
+                            try w.writeAll(", ");
+                            newline = false;
+                        }
                     },
                     .inl, .exp => {
                         try w.writeByte('\n');

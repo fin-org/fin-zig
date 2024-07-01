@@ -10,14 +10,22 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     b.installArtifact(lib);
-    const exe = b.addExecutable(.{
-        .name = "fin-tokenizer",
+    const exe_tok = b.addExecutable(.{
+        .name = "fin-tok",
         .root_source_file = b.path("src/tokenizer.zig"),
         .target = target,
         .optimize = optimize,
     });
-    b.installArtifact(exe);
-    const run_cmd = b.addRunArtifact(exe);
+    b.installArtifact(exe_tok);
+    const exe_fmt = b.addExecutable(.{
+        .name = "fin-fmt",
+        .root_source_file = b.path("src/parser.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(exe_fmt);
+
+    const run_cmd = b.addRunArtifact(exe_fmt);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);

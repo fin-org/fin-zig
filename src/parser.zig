@@ -194,6 +194,19 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
     return list.to_owned_slice();
 }
 
+pub fn main() !void {
+    var stdin = std.io.bufferedReader(std.io.getStdIn().reader());
+    var stdout = std.io.bufferedWriter(std.io.getStdOut().writer());
+    var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa = general_purpose_allocator.allocator();
+    const input = try stdin.reader().readAllAlloc(gpa, 1024 * 1000);
+    defer gpa.free(input);
+    var tree = try parse(gpa, input);
+    defer tree.deinit(gpa);
+    try tree.write(gpa, stdout.writer());
+    try stdout.flush();
+}
+
 test "empty" {
     try test_elements("", &.{.{ .kind = .map, .flag = .exp }});
     try test_elements(", ,\t\t \n\r\n,\n  ,", &.{.{ .kind = .map, .flag = .exp }});
@@ -293,42 +306,44 @@ test "nested example 1" {
     });
 }
 
-// test "io writer usage" {
-//     const ally = std.testing.allocator;
-//     var tree = try parse(ally,
-//         \\a=tag[ #
-//         \\1,2
-//         \\
-//         \\"three"
-//         \\
-//         \\], b=[]
-//         \\
-//         \\| a
-//         \\,, = | b
-//         \\
-//         \\
-//         \\
-//         \\c=(1=2 3=4 5=|6
-//         \\
-//         \\|7
-//         \\  = |8
-//         \\nest = [(
-//         \\|9
-//         \\= "done")]
-//         \\)
-//         \\d=[1,2
-//         \\
-//         \\3], #done
-//     );
-//     defer tree.deinit(ally);
+test "io writer usage" {
+    const ally = std.testing.allocator;
+    var tree = try parse(ally,
+        \\a=tag[ #
+        \\1,2
+        \\
+        \\"three"
+        \\
+        \\], b=[]
+        \\
+        \\| a
+        \\,, = | b
+        \\
+        \\
+        \\
+        \\c=(1=2 3=4 5=|6
+        \\
+        \\|7
+        \\  = |8
+        \\nest = [(
+        \\a=b, |9
+        \\= "done", |a
+        \\= |b
+        \\)]
+        \\)
+        \\d=[1,2
+        \\
+        \\3], #done
+    );
+    defer tree.deinit(ally);
 
-//     var list = std.ArrayList(u8).init(ally);
-//     defer list.deinit();
+    var list = std.ArrayList(u8).init(ally);
+    defer list.deinit();
 
-//     try tree.write(ally, list.writer());
+    try tree.write(ally, list.writer());
 
-//     std.debug.print("\n---\n{s}---\n", .{list.items});
-// }
+    std.debug.print("\n---\n{s}---\n", .{list.items});
+}
 
 const TestInput = struct {
     kind: ElementList.Kind,
