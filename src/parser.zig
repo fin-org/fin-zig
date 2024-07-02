@@ -21,7 +21,6 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
     var prev: usize = 0;
 
     while (true) {
-        // std.debug.print("{} {} {s}\n", .{ coll, prev, @tagName(token.tag) });
         switch (slice.get_kind(coll)) {
             .map, .tmap => switch (token.tag) {
                 .end => switch (path.items.len) {
@@ -144,7 +143,6 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
                     slice.expand(coll, prev);
                     slice.grow_by(coll, slice.get_size(prev));
                 },
-                // duplicated above this is just accepting a value
                 inline .sym, .num, .esc, .raw => |tag| {
                     prev = list.len;
                     switch (tag) {
