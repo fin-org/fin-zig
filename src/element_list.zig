@@ -45,10 +45,6 @@ pub fn append(self: *ElementList, kind: Kind, flag: Flag) !void {
     self.len += 1;
 }
 
-pub fn get_kind(self: *ElementList, index: usize) Kind {
-    return self.elements.items(.kind)[index];
-}
-
 // slice
 
 pub fn slice(self: *ElementList) Slice {
@@ -79,24 +75,7 @@ pub const Slice = struct {
         self.* = undefined;
     }
 
-    // kind
-
-    pub fn get_kind(self: Slice, index: usize) Kind {
-        return self.elements.items(.kind)[index];
-    }
-
     // flag
-
-    pub fn get_flag(self: Slice, index: usize) Flag {
-        return self.elements.items(.flag)[index];
-    }
-
-    pub fn expanded(self: Slice, index: usize) bool {
-        return switch (self.get_flag(index)) {
-            .exp, .exp_sep, .exp_gap => true,
-            else => false,
-        };
-    }
 
     pub fn expand(self: Slice, coll: usize, prev: usize) void {
         assert(prev > coll);
@@ -168,18 +147,6 @@ pub const Slice = struct {
     }
 
     // source
-
-    pub fn get_source(self: Slice, index: usize) ?[]const u8 {
-        return switch (self.elements.items(.kind)[index]) {
-            .sym,
-            .num,
-            .esc,
-            .raw,
-            .com,
-            => self.sources[self.elements.items(.index)[index]],
-            else => null,
-        };
-    }
 
     pub fn set_source(self: Slice, index: usize, source: []const u8) void {
         switch (self.elements.items(.kind)[index]) {

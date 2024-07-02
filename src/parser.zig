@@ -21,7 +21,7 @@ pub fn parse(ally: Allocator, input: []const u8) !ElementList.Slice {
     var prev: usize = 0;
 
     while (true) {
-        switch (slice.get_kind(coll)) {
+        switch (slice.elements.items(.kind)[coll]) {
             .map, .tmap => switch (token.tag) {
                 .end => switch (path.items.len) {
                     1 => {
@@ -402,8 +402,8 @@ fn test_elements(input: []const u8, els: []const TestInput) !void {
     try std.testing.expectEqual(tree.elements.len, els.len);
     for (els, 0..) |el, i| {
         // TODO size checks
-        try std.testing.expectEqual(el.kind, tree.get_kind(i));
-        try std.testing.expectEqual(el.flag, tree.get_flag(i));
+        try std.testing.expectEqual(el.kind, tree.elements.items(.kind)[i]);
+        try std.testing.expectEqual(el.flag, tree.elements.items(.flag)[i]);
     }
 }
 
