@@ -1,0 +1,52 @@
+## examples from website ##
+
+# welcome to fin notation!
+example_data = [
+	# symbols
+	foo, _42, crypto:sha256, :key
+
+	# numbers
+	98, 1.23e-4, -42
+
+	# strings
+	"escaped \n strings"
+	|raw strings are not escaped
+	|and can span mutliple lines
+
+	# collections (arrays & maps)
+	[], tagged["array"], [98, goal, []]
+	(), (key = "val", 55 = tagged:map())
+
+	# extensions
+	true, fin:timestamp["2024-02-26T03:01:13.644Z"]
+	ext:null, ext:nan, ext:loc(x = 1, y = 2)
+]
+
+# frontmatter
+title = "Versatile Data Model"
+tags = [fin, data]
+draft = false
+pub_date = fin:timestamp["2024-02-26T03:01:13.644Z"]
+
+# represent html
+html_fragment = div[
+	(class = "prose", id = "hero")
+	h1["Fin Data Format"]
+	p["A notation for data interchange"], hr
+	img(
+		# example with no children
+		src = "fin.webp", alt = "fin data notation"
+		width = 512, height = 512
+	)
+]
+
+# describe a program
+crypto = :namespace(url = "https://blah/crypto")
+in = fin:bytes[""]
+out = fin:bytes["e3b0c44298fc1c149afbf4..."]
+main = :function(
+	body = [
+		# sha256 test vector
+		:assert_eq[crypto:sha256[in], out]
+	]
+)
